@@ -14,7 +14,7 @@ from __future__ import annotations
 import datetime as _dt
 import math
 import sys
-from typing import Iterable, Iterator, List, Optional, Tuple, TypeVar
+from typing import Iterable, Iterator, List, Optional, Set, Tuple, TypeVar
 
 from . import _clock
 
@@ -26,6 +26,10 @@ __all__ = [
     "every_minute",
     "every_hour",
     "every_day",
+    "every_weekday",
+    "every_weekend",
+    "every_week",
+    "on_days",
     "times",
     "forever",
     "for_duration",
@@ -100,6 +104,45 @@ def every_hour(*, times: Optional[int] = None, start_now: bool = True) -> Iterat
     return every(hours=1, times=times, start_now=start_now)
 
 
+_DAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+
+def _day_number(day) -> int:
+    """'monday' / 'Mon' / 0 -> 0, ..., 'sunday' / 'Sun' / 6 -> 6."""
+    if isinstance(day, int) and not isinstance(day, bool) and 0 <= day <= 6:
+        return day
+    if isinstance(day, str):
+        name = day.strip().lower()
+        for number, full in enumerate(_DAY_NAMES):
+            if len(name) >= 3 and full.startswith(name):
+                return number
+    raise ValueError(
+        f"Expected a day like 'monday' or 'mon' (or a number 0-6, Monday=0), got {day!r}."
+    )
+
+
+def _on_days(at, days: Set[int], times: Optional[int]) -> Iterator[int]:
+    clock_time = _clock.parse_time(at)
+    _check_times(times)
+
+    def next_allowed(after_or_at: _dt.datetime) -> _dt.datetime:
+        target = after_or_at
+        while target.weekday() not in days:
+            target += _dt.timedelta(days=1)
+        return target
+
+    target = next_allowed(_clock.next_occurrence(clock_time))
+    count = 0
+    while times is None or count < times:
+        _clock.sleep_until(target)
+        yield count
+        count += 1
+        target += _dt.timedelta(days=1)
+        while target <= _clock.now():  # the body ran for over a day: skip missed days
+            target += _dt.timedelta(days=1)
+        target = next_allowed(target)
+
+
 def every_day(at: str = "00:00", *, times: Optional[int] = None) -> Iterator[int]:
     """Loop once a day at a set clock time, like at="09:00" or at="17:30:15".
 
@@ -109,18 +152,47 @@ def every_day(at: str = "00:00", *, times: Optional[int] = None) -> Iterator[int
         for _ in fl.every_day(at="08:00"):
             send_morning_report()
     """
-    clock_time = _clock.parse_time(at)
-    _check_times(times)
+    return _on_days(at, set(range(7)), times)
 
-    target = _clock.next_occurrence(clock_time)
-    count = 0
-    while times is None or count < times:
-        _clock.sleep_until(target)
-        yield count
-        count += 1
-        target += _dt.timedelta(days=1)
-        while target <= _clock.now():  # the body ran for over a day: skip missed days
-            target += _dt.timedelta(days=1)
+
+def on_days(days: Iterable, at: str = "00:00", *, times: Optional[int] = None) -> Iterator[int]:
+    """Loop on chosen days of the week at a set clock time.
+
+        for _ in fl.on_days(["mon", "wed", "fri"], at="18:00"):
+            print("Gym time!")
+
+    Days can be full names ('monday'), short names ('mon') or numbers
+    (0 = Monday ... 6 = Sunday). Yields the run number (0, 1, 2, ...).
+    """
+    if isinstance(days, (str, int)):
+        days = [days]
+    chosen = {_day_number(day) for day in days}
+    if not chosen:
+        raise ValueError("on_days() needs at least one day, for example on_days(['mon']).")
+    return _on_days(at, chosen, times)
+
+
+def every_weekday(at: str = "00:00", *, times: Optional[int] = None) -> Iterator[int]:
+    """Loop Monday to Friday at a set clock time.
+
+        for _ in fl.every_weekday(at="09:00"):
+            print("Time for work!")
+    """
+    return _on_days(at, {0, 1, 2, 3, 4}, times)
+
+
+def every_weekend(at: str = "00:00", *, times: Optional[int] = None) -> Iterator[int]:
+    """Loop on Saturday and Sunday at a set clock time."""
+    return _on_days(at, {5, 6}, times)
+
+
+def every_week(on: str = "monday", at: str = "00:00", *, times: Optional[int] = None) -> Iterator[int]:
+    """Loop once a week on one day at a set clock time.
+
+        for _ in fl.every_week(on="sunday", at="20:00"):
+            plan_the_week()
+    """
+    return _on_days(at, {_day_number(on)}, times)
 
 
 def for_duration(seconds: float = 0, minutes: float = 0, hours: float = 0) -> Iterator[int]:

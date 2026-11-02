@@ -35,4 +35,9 @@ say.table(
     ]
 )
 
+# A spinner while something slow happens
+with say.spinner("Thinking") as spin:
+    w.seconds(1.5)
+    spin.text = "Thought about it"
+
 say.warning(f"Your new password: {r.password()}")

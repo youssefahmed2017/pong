@@ -54,3 +54,41 @@ def test_table_from_dicts_with_missing_keys(capsys):
 def test_empty_table(capsys):
     say.table([])
     assert capsys.readouterr().out == "(empty table)\n"
+
+
+import io
+import time
+
+import pytest
+
+
+def test_spinner_not_a_terminal_prints_final_line(capsys, monkeypatch):
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    with say.spinner("Downloading") as spin:
+        spin.text = "Downloaded"
+    assert capsys.readouterr().out == "✔ Downloaded\n"
+
+
+def test_spinner_marks_errors_and_lets_them_through(capsys, monkeypatch):
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    with pytest.raises(KeyError):
+        with say.spinner("Saving"):
+            raise KeyError("x")
+    assert capsys.readouterr().out == "✘ Saving\n"
+
+
+class FakeTerminal(io.StringIO):
+    def isatty(self):
+        return True
+
+
+def test_spinner_animates_in_a_terminal(monkeypatch):
+    monkeypatch.setenv("NO_COLOR", "1")
+    term = FakeTerminal()
+    monkeypatch.setattr("sys.stdout", term)
+    spin = say.Spinner("Thinking", interval=0.01).start()
+    time.sleep(0.05)
+    spin.stop()
+    out = term.getvalue()
+    assert "⠋ Thinking" in out
+    assert out.endswith("\r✔ Thinking\n")

@@ -7,6 +7,9 @@
     say.box("Welcome to my game")
     say.table([{"name": "Ann", "score": 12}, {"name": "Bob", "score": 9}])
 
+    with say.spinner("Downloading"):
+        download_everything()
+
 Colors are only used when printing to a real terminal. Set the NO_COLOR
 environment variable to turn them off, or FORCE_COLOR to always use them.
 """
@@ -15,9 +18,10 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from typing import Any, List, Mapping, Optional, Sequence, Union
 
-__all__ = ["success", "error", "warning", "info", "box", "table"]
+__all__ = ["success", "error", "warning", "info", "box", "table", "spinner", "Spinner"]
 
 _RESET = "\033[0m"
 _COLORS = {
@@ -143,3 +147,77 @@ def table(
         print("-+-".join("-" * w for w in widths))
     for raw, text_row in zip(raw_rows, text_rows):
         print(line(text_row, [_is_number(cell) for cell in raw]))
+
+
+class Spinner:
+    """A spinning animation that shows something is happening.
+
+        with say.spinner("Downloading"):
+            download_everything()
+
+    While the block runs:   ⠹ Downloading
+    When it finishes:       ✔ Downloading
+    If an error happens:    ✘ Downloading   (and the error carries on as normal)
+
+    Change the text while it spins with `spin.text = "..."`. When the output
+    isn't a terminal (for example a log file), only the final line is printed.
+    """
+
+    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self, text: str = "Working", interval: float = 0.1) -> None:
+        self.text = text
+        self.interval = interval
+        self._stream = sys.stdout
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._width = 0
+
+    def _write(self, line: str) -> None:
+        padding = " " * max(0, self._width - len(line))
+        self._stream.write("\r" + line + padding)
+        self._stream.flush()
+        self._width = len(line)
+
+    def _animate(self) -> None:
+        frame = 0
+        while not self._stop.is_set():
+            self._write(f"{self.FRAMES[frame % len(self.FRAMES)]} {self.text}")
+            frame += 1
+            self._stop.wait(self.interval)
+
+    def start(self) -> "Spinner":
+        """Start spinning. Returns the spinner itself."""
+        self._stream = sys.stdout
+        isatty = getattr(self._stream, "isatty", None)
+        if self._thread is None and isatty and isatty():
+            self._stop.clear()
+            self._thread = threading.Thread(target=self._animate, daemon=True)
+            self._thread.start()
+        return self
+
+    def stop(self, ok: bool = True) -> None:
+        """Stop spinning and print the final ✔ (ok) or ✘ (not ok) line."""
+        if self._thread is not None:
+            self._stop.set()
+            self._thread.join()
+            self._thread = None
+        symbol, color = ("✔", "green") if ok else ("✘", "red")
+        if self._width:
+            self._write(_paint(f"{symbol} {self.text}", color, self._stream))
+            self._stream.write("\n")
+            self._width = 0
+        else:
+            print(_paint(f"{symbol} {self.text}", color, self._stream), file=self._stream)
+        self._stream.flush()
+
+    def __enter__(self) -> "Spinner":
+        return self.start()
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.stop(ok=exc_type is None)
+
+
+def spinner(text: str = "Working") -> Spinner:
+    """Show a spinner while a `with` block runs. See Spinner for details."""
+    return Spinner(text)

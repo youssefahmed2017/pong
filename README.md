@@ -46,6 +46,10 @@ from easyutils import forloop as fl
 for _ in fl.every_hour(): ...              # now, then every hour, forever
 for run in fl.every(seconds=10, times=5): ...  # 5 runs, 10 seconds apart
 for _ in fl.every_day(at="09:00"): ...     # every day at 9 in the morning
+for _ in fl.every_weekday(at="09:00"): ... # Monday to Friday
+for _ in fl.every_weekend(at="10:00"): ... # Saturday and Sunday
+for _ in fl.every_week(on="sunday", at="20:00"): ...
+for _ in fl.on_days(["mon", "wed", "fri"], at="18:00"): ...
 for _ in fl.every_second(): ...
 for _ in fl.every_minute(): ...
 
@@ -113,6 +117,7 @@ name = ask.text("What's your name? ")
 age = ask.number("How old are you? ", whole=True, min=0, max=130)
 again = ask.yes_no("Play again?", default=True)
 color = ask.choice("Pick a color:", ["red", "green", "blue"])
+secret = ask.password("New password: ", confirm=True, min_length=8)  # hidden typing
 ```
 
 Bad answers get a short explanation and the question is asked again.
@@ -128,6 +133,10 @@ say.warning("Careful")     # ! Careful  (yellow)
 say.info("FYI")            # i FYI      (blue)
 say.box("Welcome!")
 say.table([{"name": "Ann", "score": 12}, {"name": "Bob", "score": 9}])
+
+with say.spinner("Downloading") as spin:   # ⠹ Downloading ... then ✔ Downloading
+    download_everything()
+    spin.text = "Downloaded"               # change the text while it spins
 ```
 
 Colors are only used in a real terminal. Set `NO_COLOR=1` to turn them off,
@@ -148,7 +157,13 @@ data = ef.read_json("save.json")
 for line in ef.lines("big.log"): ...   # one line at a time, newline removed
 ef.exists("save.json"); ef.delete("save.json")
 ef.list_files("photos", "*.jpg")
+
+ef.write_csv("scores.csv", [{"name": "Ann", "score": 12}])
+ef.append_csv("scores.csv", {"name": "Bob", "score": 9})
+rows = ef.read_csv("scores.csv")       # [{"name": "Ann", "score": "12"}, ...]
 ```
+
+CSV values are read back as text; use `int()` or `float()` for numbers.
 
 ### `safe`: error handling
 
@@ -192,6 +207,10 @@ python -m pytest
 
 The timed loops are tested with a fake clock, so the whole suite runs in
 under a second.
+
+## Changes
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

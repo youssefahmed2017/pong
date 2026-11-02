@@ -12,15 +12,15 @@ Modules:
     loopvars  helpers for values you track inside loops (Counter, Total, Seen, LoopTimer)
     wait      pausing and timing (seconds, until, stopwatch)
     ask       asking the user for input, with automatic re-asking on bad answers
-    say       pretty printing (success, error, box, table)
-    files     one-line file reading and writing (read, write, read_json, ...)
+    say       pretty printing (success, error, box, table, spinner)
+    files     one-line file reading and writing (read, write, read_json, read_csv, ...)
     safe      error handling without try/except (retry, timeout, run)
     rand      randomness made simple (coin_flip, dice, pick, password, chance)
 """
 
 from . import ask, files, forloop, loopvars, rand, safe, say, wait
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "ask",
