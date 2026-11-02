@@ -192,3 +192,7 @@ python -m pytest
 
 The timed loops are tested with a fake clock, so the whole suite runs in
 under a second.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
