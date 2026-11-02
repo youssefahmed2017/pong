@@ -11,14 +11,18 @@
     for line in ef.lines("big_log.txt"):
         ...
 
+    ef.write_csv("scores.csv", [{"name": "Ann", "score": 12}])
+    rows = ef.read_csv("scores.csv")   # [{"name": "Ann", "score": "12"}]
+
 Text is read and written as UTF-8. Folders are created for you when writing.
 """
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
-from typing import Any, Iterator, List, Union
+from typing import Any, Iterator, List, Mapping, Optional, Sequence, Union
 
 __all__ = [
     "read",
@@ -26,6 +30,9 @@ __all__ = [
     "append",
     "read_json",
     "write_json",
+    "read_csv",
+    "write_csv",
+    "append_csv",
     "lines",
     "exists",
     "delete",
@@ -76,6 +83,76 @@ def read_json(path: PathLike) -> Any:
 def write_json(path: PathLike, data: Any, indent: int = 2) -> None:
     """Save data (dicts, lists, strings, numbers...) to a JSON file."""
     write(path, json.dumps(data, indent=indent, ensure_ascii=False))
+
+
+def read_csv(path: PathLike, header: bool = True) -> List[Any]:
+    """Read a CSV file.
+
+    With header=True (the default) the first row holds the column names and
+    you get a list of dicts:  [{"name": "Ann", "score": "12"}, ...]
+    With header=False you get a list of lists:  [["Ann", "12"], ...]
+
+    Every value comes back as text; use int() or float() to turn it into a number.
+    """
+    p = _file_must_exist(path)
+    with p.open(encoding="utf-8-sig", newline="") as f:
+        if header:
+            return [dict(row) for row in csv.DictReader(f)]
+        return [row for row in csv.reader(f)]
+
+
+def _csv_rows(rows: Sequence[Any], headers: Optional[Sequence[str]]):
+    """Split rows (dicts or lists) into a header list and a list of plain rows."""
+    if rows and isinstance(rows[0], Mapping):
+        if headers is None:
+            headers = []
+            for row in rows:
+                for key in row:
+                    if key not in headers:
+                        headers.append(key)
+        return list(headers), [[row.get(h, "") for h in headers] for row in rows]
+    return (list(headers) if headers is not None else None), [list(row) for row in rows]
+
+
+def write_csv(path: PathLike, rows: Sequence[Any], headers: Optional[Sequence[str]] = None) -> None:
+    """Save rows to a CSV file, replacing what was there.
+
+        ef.write_csv("scores.csv", [{"name": "Ann", "score": 12}])          # dicts
+        ef.write_csv("scores.csv", [["Ann", 12]], headers=["name", "score"])  # lists
+    """
+    head, body = _csv_rows(rows, headers)
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        if head is not None:
+            writer.writerow(head)
+        writer.writerows(body)
+
+
+def append_csv(path: PathLike, row: Union[Sequence[Any], Mapping[str, Any]]) -> None:
+    """Add one row to the end of a CSV file.
+
+    For a dict row, the columns are matched to the file's header row. If the
+    file doesn't exist yet, it's created with the dict's keys as the header.
+    """
+    p = Path(path)
+    if isinstance(row, Mapping):
+        if p.exists() and p.stat().st_size > 0:
+            with p.open(encoding="utf-8-sig", newline="") as f:
+                head = next(csv.reader(f), [])
+            unknown = [key for key in row if key not in head]
+            if unknown:
+                raise ValueError(f"'{path}' has no column called {unknown[0]!r}. Columns: {head}.")
+            values = [row.get(h, "") for h in head]
+        else:
+            write_csv(p, [row])
+            return
+    else:
+        values = list(row)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("a", encoding="utf-8", newline="") as f:
+        csv.writer(f).writerow(values)
 
 
 def lines(path: PathLike) -> Iterator[str]:

@@ -58,3 +58,26 @@ def test_choice_by_number_or_text(answers, capsys):
 def test_choice_needs_options():
     with pytest.raises(ValueError):
         ask.choice("Pick:", [])
+
+
+@pytest.fixture
+def secret_answers(monkeypatch):
+    def feed(*replies):
+        queue = list(replies)
+        monkeypatch.setattr("getpass.getpass", lambda prompt="": queue.pop(0))
+
+    return feed
+
+
+def test_password(secret_answers):
+    secret_answers("hunter2")
+    assert ask.password() == "hunter2"
+
+
+def test_password_rules_and_confirm(secret_answers, capsys):
+    secret_answers("", "short", "longenough", "different", "longenough", "longenough")
+    assert ask.password(confirm=True, min_length=8) == "longenough"
+    out = capsys.readouterr().out
+    assert "Please type a password" in out
+    assert "at least 8 characters" in out
+    assert "didn't match" in out

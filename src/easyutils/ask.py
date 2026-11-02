@@ -7,13 +7,15 @@
     if ask.yes_no("Play again?"):
         ...
     color = ask.choice("Pick a color:", ["red", "green", "blue"])
+    secret = ask.password("New password: ", confirm=True, min_length=8)
 """
 
 from __future__ import annotations
 
+import getpass
 from typing import List, Optional, Sequence, TypeVar, Union
 
-__all__ = ["text", "number", "yes_no", "choice"]
+__all__ = ["text", "number", "yes_no", "choice", "password"]
 
 T = TypeVar("T")
 
@@ -106,3 +108,23 @@ def choice(prompt: str, options: Sequence[T]) -> T:
             if str(option).lower() == answer.lower():
                 return option
         print(f"Please type a number from 1 to {len(option_list)}, or one of the options.")
+
+
+def password(prompt: str = "Password: ", confirm: bool = False, min_length: int = 0) -> str:
+    """Ask for a password without showing what's typed.
+
+    With confirm=True the user types it twice and must match.
+    With min_length the password must be at least that many characters.
+    """
+    while True:
+        answer = getpass.getpass(prompt)
+        if not answer:
+            print("Please type a password.")
+            continue
+        if len(answer) < min_length:
+            print(f"Please use at least {min_length} characters.")
+            continue
+        if confirm and getpass.getpass("Type it again: ") != answer:
+            print("The passwords didn't match. Let's try again.")
+            continue
+        return answer

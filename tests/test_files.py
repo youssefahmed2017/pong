@@ -52,3 +52,40 @@ def test_list_files(tmp_path):
     assert len(ef.list_files(tmp_path, "**/*.txt")) == 3
     with pytest.raises(NotADirectoryError):
         ef.list_files(tmp_path / "missing")
+
+
+def test_csv_dicts_round_trip(tmp_path):
+    path = tmp_path / "scores.csv"
+    ef.write_csv(path, [{"name": "Ann", "score": 12}, {"name": "Bob, Jr.", "city": "Cairo"}])
+    assert ef.read_csv(path) == [
+        {"name": "Ann", "score": "12", "city": ""},
+        {"name": "Bob, Jr.", "score": "", "city": "Cairo"},
+    ]
+
+
+def test_csv_lists(tmp_path):
+    path = tmp_path / "data.csv"
+    ef.write_csv(path, [["Ann", 12], ["Bob", 9]], headers=["name", "score"])
+    assert ef.read_csv(path, header=False) == [["name", "score"], ["Ann", "12"], ["Bob", "9"]]
+    ef.write_csv(path, [[1, 2]])
+    assert ef.read(path) == "1,2\n"  # no header row when none is given
+
+
+def test_append_csv(tmp_path):
+    path = tmp_path / "log" / "visits.csv"
+    ef.append_csv(path, {"name": "Ann", "visits": 1})   # creates file + header
+    ef.append_csv(path, {"visits": 5, "name": "Bob"})   # matched by column name
+    ef.append_csv(path, ["Cy", 2])
+    assert ef.read_csv(path) == [
+        {"name": "Ann", "visits": "1"},
+        {"name": "Bob", "visits": "5"},
+        {"name": "Cy", "visits": "2"},
+    ]
+    with pytest.raises(ValueError, match="no column called 'age'"):
+        ef.append_csv(path, {"name": "Dee", "age": 30})
+
+
+def test_read_csv_handles_excel_bom(tmp_path):
+    path = tmp_path / "excel.csv"
+    path.write_bytes("﻿name,age\nAnn,30\n".encode("utf-8"))
+    assert ef.read_csv(path) == [{"name": "Ann", "age": "30"}]

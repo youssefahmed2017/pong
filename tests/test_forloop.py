@@ -155,3 +155,47 @@ def test_mark_last():
     assert list(fl.mark_last("abc")) == [("a", False), ("b", False), ("c", True)]
     assert list(fl.mark_last(["only"])) == [("only", True)]
     assert list(fl.mark_last([])) == []
+
+
+# fake clock starts on Thursday 2026-01-01 at 08:00
+
+def test_every_weekday_skips_the_weekend(clock):
+    days = [clock.wall.strftime("%a %d") for _ in fl.every_weekday(at="09:00", times=4)]
+    assert days == ["Thu 01", "Fri 02", "Mon 05", "Tue 06"]
+    assert clock.wall.time() == dt.time(9, 0)
+
+
+def test_every_weekend(clock):
+    days = [clock.wall.strftime("%a %d") for _ in fl.every_weekend(at="10:00", times=3)]
+    assert days == ["Sat 03", "Sun 04", "Sat 10"]
+
+
+def test_every_week(clock):
+    moments = [clock.wall for _ in fl.every_week(on="Mon", at="07:30", times=2)]
+    assert moments == [dt.datetime(2026, 1, 5, 7, 30), dt.datetime(2026, 1, 12, 7, 30)]
+
+
+def test_every_week_today_but_time_passed_means_next_week(clock):
+    next(fl.every_week(on="thursday", at="07:00"))
+    assert clock.wall == dt.datetime(2026, 1, 8, 7, 0)
+
+
+def test_on_days_accepts_names_and_numbers(clock):
+    days = [clock.wall.strftime("%a") for _ in fl.on_days(["mon", "Wednesday", 4], at="18:00", times=4)]
+    assert days == ["Fri", "Mon", "Wed", "Fri"]
+
+
+def test_on_days_single_day_string(clock):
+    next(fl.on_days("sat", at="12:00"))
+    assert clock.wall == dt.datetime(2026, 1, 3, 12, 0)
+
+
+@pytest.mark.parametrize("bad", ["funday", "m", 7, -1, True])
+def test_bad_day_gives_helpful_error(bad):
+    with pytest.raises(ValueError, match="monday"):
+        next(fl.on_days([bad]))
+
+
+def test_on_days_needs_a_day():
+    with pytest.raises(ValueError):
+        next(fl.on_days([]))
