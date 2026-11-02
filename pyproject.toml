@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "easyutils-py"
+version = "0.1.0"
+description = "Simple, readable helpers for everyday Python: loops, waiting, input, printing, files and more."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []
+keywords = ["utilities", "beginner", "loops", "scheduling", "helpers"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
